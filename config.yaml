@@ -1,0 +1,93 @@
+# ============================================================
+# CMAS-Deepfake-Detection master configuration
+# Every script reads its settings from here unless overridden
+# via CLI flags (see `python train.py --help`).
+# ============================================================
+
+seed: 42
+
+paths:
+  data_root: data/fakeavceleb
+  train_manifest: data/fakeavceleb/train_manifest.csv
+  val_manifest: data/fakeavceleb/val_manifest.csv
+  test_manifest: data/fakeavceleb/test_manifest.csv
+  cache_dir: cache/                 # cached face frames + audio embeddings
+  checkpoint_dir: checkpoints/
+  log_dir: logs/
+  results_dir: results/
+
+model:
+  visual_backbone: efficientnet_b0        # efficientnet_b0 | efficientnet_b4
+  visual_pretrained: true
+  visual_embed_dim: 1280                  # 1280 for B0, 1792 for B4
+  num_frames: 8                            # frames sampled per video
+  audio_model_name: facebook/wav2vec2-base
+  audio_embed_dim: 768
+  fusion_type: cross_attention              # cross_attention | attention_pool
+  fusion_hidden_dim: 512
+  fusion_num_heads: 4
+  fusion_dropout: 0.3
+  num_classes: 2                            # REAL, FAKE
+
+training:
+  batch_size: 8
+  num_workers: 0   # see README §5 — mediapipe's TFLite delegate + DataLoader fork() is a known deadlock risk above 0
+  epochs: 30
+  learning_rate: 1.0e-4
+  backbone_learning_rate: 1.0e-5
+  weight_decay: 0.01
+  optimizer: adamw
+  scheduler: cosine_warmup                 # cosine_warmup | reduce_on_plateau
+  warmup_ratio: 0.1
+  mixed_precision: true
+  grad_clip_norm: 1.0
+  early_stopping_patience: 5
+  early_stopping_metric: val_f1
+  freeze_backbone_epochs: 3                 # freeze visual/audio encoders for first N epochs
+  # class_weighted_loss=false: DOES NOT AFFECT ALREADY-TRAINED CHECKPOINTS.
+  # Only matters if you retrain. Diagnosis (see check_class_distribution.py
+  # and evaluate.py --tune_threshold): with sampling.balanced=true AND
+  # class_weighted_loss=true both active, REAL-class errors were penalized
+  # ~42x more than FAKE-class errors on top of the sampler already
+  # equalizing per-batch class exposure — a double-correction that pushed
+  # all three trained models (visual/audio/multimodal) toward heavily
+  # under-predicting FAKE (precision~1.0, recall 27-60%, despite decent-to-
+  # strong ROC-AUC 0.74-0.99, meaning the underlying score ranking was fine —
+  # only the learned decision boundary was skewed). Turned off here so any
+  # future retraining doesn't reproduce the same bias; sampling.balanced
+  # alone already addresses the class imbalance at the data-loading level.
+  class_weighted_loss: false
+  label_smoothing: 0.05
+
+audio:
+  sample_rate: 16000
+  max_duration_sec: 3.0
+  mono: true
+
+augmentation:
+  visual:
+    horizontal_flip_prob: 0.5
+    color_jitter: true
+    random_crop_scale: [0.85, 1.0]
+    gaussian_blur_prob: 0.1
+  audio:
+    add_noise_prob: 0.3
+    noise_snr_db: [10, 30]
+    time_shift_prob: 0.3
+    time_shift_max_sec: 0.2
+
+sampling:
+  balanced: true                            # oversample minority class per epoch
+
+explainability:
+  ig_n_steps: 50
+  attribution_method: both                  # integrated_gradients | ablation | both  (legacy alias "attention" -> "ablation" still accepted)
+  cmas_exclude_real: true
+
+logging:
+  use_tensorboard: true
+  log_every_n_steps: 20
+
+device:
+  auto_detect: true                          # uses CUDA if available, else CPU
+  mixed_precision_dtype: float16

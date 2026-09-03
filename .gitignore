@@ -1,0 +1,33 @@
+# Data & datasets
+data/
+*.mp4
+*.wav
+
+# Cache
+cache/
+*.npy
+
+# Checkpoints & results
+checkpoints/*.pt
+logs/
+results/*.json
+results/*.csv
+results/*.png
+!results/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
+
+# Jupyter / Colab
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+
+# Env
+.env

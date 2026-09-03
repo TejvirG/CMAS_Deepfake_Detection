@@ -1,0 +1,91 @@
+# ============================================================
+# CMAS-Deepfake-Detection requirements.txt
+# Audited and rewritten for a fresh Google Colab runtime
+# (Ubuntu 22.04, Python 3.12, CUDA GPU) — see the notes below
+# for exactly what changed and why.
+# ============================================================
+#
+# TORCH / TORCHVISION — deliberately NOT pinned to an exact version.
+# Colab ships a GPU-matched torch+torchvision build preinstalled. A plain
+# `pip install torch` pulls the ENTIRE CUDA toolkit stack from PyPI
+# (nvidia-cublas, nvidia-cudnn, nvidia-cusolver, triton, ...) — several GB —
+# and can silently replace Colab's correctly-matched CUDA build with a
+# mismatched one, or just exhaust disk space (empirically reproduced while
+# auditing this file). The floors below (torch>=2.4, torchvision>=0.19) are
+# satisfied by every Colab runtime since mid-2024, so `pip install -r
+# requirements.txt` on Colab leaves the preinstalled build untouched and
+# only installs what's actually missing. On a bare (non-Colab) machine with
+# no torch installed, pip will install a modern version from PyPI — if you
+# need a specific CUDA build there, use the selector at pytorch.org instead
+# of relying on this floor.
+torch>=2.4.0
+torchvision>=0.19.0
+# torchaudio removed: audited every .py file in this repo (see the AST-based
+# import scan in the dependency-audit notes) and confirmed it is never
+# imported anywhere. Audio I/O goes through soundfile + transformers'
+# Wav2Vec2FeatureExtractor, neither of which needs torchaudio.
+
+transformers>=4.46.0
+# NOTE: transformers 5.x (current as of this audit) no longer pulls torch in
+# automatically via a plain `pip install transformers` — torch is only
+# auto-installed via the `transformers[torch]` extra. That's fine here since
+# torch is already required above, but worth knowing if you ever trim this
+# file.
+timm>=1.0.0
+captum>=0.7.0           # requires torch>=2.3 internally; satisfied by the floor above
+
+# --- Computer vision ---
+# opencv-contrib-python ONLY — do not also add opencv-python or
+# opencv-python-headless. mediapipe depends on opencv-contrib-python
+# directly, and having both an opencv-python* variant AND
+# opencv-contrib-python installed at once is a well-known source of
+# `cv2` import breakage (they install into the same namespace and pip's
+# resolver doesn't know they're mutually exclusive). opencv-contrib-python
+# is a superset of opencv-python, so nothing is lost.
+opencv-contrib-python>=4.9.0
+
+# --- Face detection ---
+# mediapipe's legacy `mediapipe.solutions.face_detection` API (used in an
+# earlier version of this file) had its support ended by Google in March
+# 2023 and does not work on any current mediapipe release — pinning an old
+# version doesn't bring it back, and the specific old pin previously used
+# here (0.10.9) isn't even in the package index anymore. The code now uses
+# the current `mediapipe.tasks.python.vision.FaceDetector` API instead (see
+# models/visual_encoder.py). Verified field-for-field compatible against
+# both 0.10.33 (current stable line) and the new 1.0.0 major version while
+# auditing this file, so left unpinned above a recent floor.
+mediapipe>=0.10.14
+
+numpy>=1.26.0
+pandas>=2.1.0
+scikit-learn>=1.4.0
+matplotlib>=3.8.0
+seaborn>=0.13.0
+tqdm>=4.66.0
+pyyaml>=6.0
+gradio>=5.0.0
+tensorboard>=2.16.0
+soundfile>=0.12.1
+pytest>=7.4.0
+
+# --- Explicitly NOT included (audited and confirmed unused) ---
+# tensorflow / tensorflow-*  : not imported anywhere in this repo, and not a
+#   dependency of anything we use (mediapipe's Tasks API does not require
+#   the Python `tensorflow` package). Colab's base image ships TensorFlow
+#   preinstalled system-wide for other notebooks' benefit; this project
+#   never imports it and this file does not touch it either way.
+# librosa                    : not imported anywhere (audio I/O uses
+#   soundfile + transformers' Wav2Vec2FeatureExtractor).
+# ffmpeg-python              : not imported anywhere. Audio extraction shells
+#   out to the SYSTEM `ffmpeg` binary via subprocess, not a Python package —
+#   see the ffmpeg note below.
+# openpyxl / Pillow          : not imported anywhere in the shipped code path
+#   (Pillow is still pulled in transitively by gradio; that's fine, we don't
+#   need to pin it ourselves).
+#
+# --- Not a pip package ---
+# ffmpeg (the system binary) is required by models/audio_encoder.py via
+# subprocess and is preinstalled on Colab. On a bare machine:
+#   apt-get install -y ffmpeg      (Ubuntu/Debian)
+#   brew install ffmpeg            (macOS)
+
