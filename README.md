@@ -1,289 +1,195 @@
-# CMAS: Cross-Modal Attribution Score for Explainable Audio-Visual Deepfake Detection
+CMAS: Cross-Modal Attribution Score for Audio-Visual Deepfake Detection
 
-CMAS is an audio-visual deepfake detection project that I built to study both deepfake classification and the explanations produced by multimodal models.
+A multimodal audio-visual deepfake detection system with a focus on evaluating whether model explanations identify the modality that was actually manipulated.
 
-The system uses video and audio together to classify media as real or fake. Along with the detector, I introduce the **Cross-Modal Attribution Score (CMAS)**, a metric for evaluating whether a model's explanation points to the modality that was actually manipulated.
+The project introduces the Cross-Modal Attribution Score (CMAS), a simple modality-level metric for comparing an explanation's visual and audio contributions with the known manipulated modality of a deepfake sample.
 
-The main idea is simple. A model can correctly classify a clip as fake without necessarily relying on the right evidence. If only the audio was manipulated, for example, I would expect the model to rely more on the audio than the video. CMAS provides a way to measure this type of explanation alignment at the modality level.
+The project uses FakeAVCeleb, which contains real videos as well as video-only, audio-only, and audio-video manipulated samples.
 
-The project was evaluated using the FakeAVCeleb dataset.
+Project Overview
 
-## Paper
+Multimodal deepfake detectors can combine information from both video and audio to decide whether a sample is real or fake. However, getting the final prediction right does not necessarily mean that the model relied on the correct modality.
 
-The complete paper is available here:
+For example, if only the audio has been manipulated, an explanation should ideally indicate that audio contributed more strongly to the decision.
 
-[**CMAS.pdf**](Result/CMAS.pdf)
+This project explores that problem through CMAS.
 
-**Title:**
+The main components are:
+
+Visual feature extraction using EfficientNet-B0
+Audio feature extraction using Wav2Vec2-base
+Audio-visual feature fusion using cross-attention
+Deepfake classification
+Integrated Gradients attribution
+Modality ablation attribution
+CMAS for modality-level explanation evaluation
+Evaluation on FakeAVCeleb
+
+The implementation and experiments are intended to support the accompanying research paper.
+
+Paper
+
+The current version of the paper is available in:
+
+Result/CMAS.pdf
+
+Title:
 CMAS: A Cross-Modal Attribution Score for Modality-Level Explanation Evaluation in Audio-Visual Deepfake Detection
 
-The paper contains the complete methodology, experimental setup, results, explainability analysis, and limitations.
+The paper is currently a preprint/research manuscript under submission. It has not been presented here as a published paper or accepted publication.
 
-## What I built
+If the paper is accepted or published, this section can be updated with the official publication information.
 
-The project includes:
+Method
 
-* Audio-visual deepfake detection
-* Visual-only and audio-only baselines
-* A multimodal model using both modalities
-* EfficientNet-B0 for visual features
-* Wav2Vec2-base for audio features
-* Cross-modal fusion
-* Integrated Gradients for attribution
-* Modality ablation for attribution
-* The CMAS metric
-* Classification and explainability evaluation
-* A Gradio demo for individual video inference
+The system has two main input streams.
 
-## Results
+Video
 
-The final multimodal model was evaluated on a test split containing 3,103 clips.
+Video frames are sampled from each clip and processed using:
 
-| Model       | Accuracy | Precision | Recall |     F1 | ROC-AUC |
-| ----------- | -------: | --------: | -----: | -----: | ------: |
-| Visual-only |   97.23% |    99.93% | 97.23% | 98.56% |  98.36% |
-| Audio-only  |   84.56% |    99.04% | 85.01% | 91.49% |  83.60% |
-| Multimodal  |   99.55% |    99.97% | 99.57% | 99.77% |  99.93% |
+OpenCV for video handling
+MediaPipe for face detection
+EfficientNet-B0 for visual feature extraction
 
-The CMAS evaluation produced the following results:
+The frame-level features are aggregated into a visual representation.
 
-| Attribution Method   | Mean CMAS | Standard Deviation |
-| -------------------- | --------: | -----------------: |
-| Modality Ablation    |    0.9997 |             0.0052 |
-| Integrated Gradients |    0.9466 |             0.0340 |
-| Both                 |    0.9859 |             0.0067 |
+Audio
 
-The CMAS analysis was performed on 125 FAKE samples with defined manipulated-modality labels.
+Audio is extracted from the video and converted to a 16 kHz mono waveform.
 
-The complete results and analysis are available in [CMAS.pdf](Result/CMAS.pdf).
+The audio stream uses:
 
-## Dataset
+FFmpeg for audio extraction
+Wav2Vec2-base for audio representation
+Mean pooling for the final audio embedding
+Multimodal Fusion
 
-I used the **FakeAVCeleb** dataset for the experiments.
+The visual and audio representations are combined using a cross-attention based fusion module.
 
-The full dataset contains 21,544 clips:
+The resulting multimodal representation is passed to a classifier that predicts whether the input is REAL or FAKE.
 
-| Category             | Number of clips |
-| -------------------- | --------------: |
-| Real                 |             500 |
-| Video-only fake      |           9,709 |
-| Audio-only fake      |             500 |
-| Audio and video fake |          10,835 |
-| Total                |          21,544 |
+CMAS
 
-The dataset is not included in this repository. Access needs to be requested from the dataset authors, and the dataset's research-use terms should be followed.
+The main idea of CMAS is to evaluate whether an explanation assigns importance to the modality that was actually manipulated.
 
-After obtaining the dataset, the repository can be used to create the required manifests:
+For each manipulated sample, the ground-truth modality is represented as a two-element vector:
 
-```bash
-python prepare_fakeavceleb.py \
-    --raw_dir /path/to/FakeAVCeleb \
-    --out_dir data/fakeavceleb \
-    --val_ratio 0.15 \
-    --test_ratio 0.15
-```
+Video-only  -> [1, 0]
+Audio-only  -> [0, 1]
+Both        -> [0.5, 0.5]
 
-This creates:
+An explanation method produces a corresponding attribution vector:
 
-```text
-data/fakeavceleb/
-├── train_manifest.csv
-├── val_manifest.csv
-└── test_manifest.csv
-```
+e = [video contribution, audio contribution]
 
-Each manifest contains:
+The attribution vector is normalized before comparison.
 
-```text
-video_path
-label
-manipulated_modality
-```
+CMAS is then calculated using cosine similarity between the ground-truth modality vector and the explanation vector.
 
-The `label` can be:
+A higher score means that the explanation is more aligned with the known manipulated modality.
 
-```text
-REAL
-FAKE
-```
+The implementation is located in:
 
-The `manipulated_modality` can be:
-
-```text
-none
-audio
-video
-both
-```
-
-## Model architecture
-
-The overall pipeline is:
-
-```text
-                    Input Video
-                        |
-                        v
-                 Frame Sampling
-                        |
-                        v
-                  Face Detection
-                        |
-                        v
-                  EfficientNet-B0
-                        |
-                        v
-                 Visual Features
-                        |
-                        |
-                        |        Input Audio
-                        |             |
-                        |             v
-                        |       Audio Extraction
-                        |             |
-                        |             v
-                        |        Wav2Vec2-base
-                        |             |
-                        |             v
-                        |        Audio Features
-                        |             |
-                        +------+------+
-                               |
-                               v
-                       Multimodal Fusion
-                               |
-                               v
-                           Classifier
-                               |
-                               v
-                         REAL / FAKE
-```
-
-### Visual branch
-
-I use EfficientNet-B0 as the default visual encoder.
-
-A fixed number of frames are sampled from each video. Face detection is performed using MediaPipe, and the processed frames are passed through EfficientNet.
-
-The frame-level features are combined to produce a visual representation.
-
-The repository also contains support for EfficientNet-B4 for systems with more available GPU memory.
-
-### Audio branch
-
-The audio branch uses Wav2Vec2-base.
-
-Audio is extracted using FFmpeg and converted to mono 16 kHz audio before being passed to Wav2Vec2.
-
-The resulting representations are pooled to produce a fixed-size audio representation.
-
-### Fusion
-
-The visual and audio representations are combined using a cross-modal fusion module.
-
-The fused representation is then passed to a classifier that predicts whether the input is REAL or FAKE.
-
-I also evaluate the visual and audio branches separately to compare the contribution of each modality.
-
-## CMAS
-
-### Cross-Modal Attribution Score
-
-The main research contribution of this project is CMAS.
-
-The idea is to represent the model's explanation using two values:
-
-```text
-[visual_importance, audio_importance]
-```
-
-The known manipulated modality is represented in the same two-dimensional space.
-
-For a video-only fake:
-
-```text
-[1, 0]
-```
-
-For an audio-only fake:
-
-```text
-[0, 1]
-```
-
-For a fake where both modalities are manipulated:
-
-```text
-[0.5, 0.5]
-```
-
-Real samples are not included in CMAS because they do not have a manipulated modality.
-
-CMAS is calculated using cosine similarity:
-
-```text
-CMAS(sample) = cosine_similarity(e, g)
-```
-
-where `e` is the explanation-derived attribution vector and `g` is the ground-truth modality vector.
-
-A higher CMAS value means that the model's attribution is more closely aligned with the known manipulated modality.
-
-The implementation is in:
-
-```text
 metrics/cmas.py
-```
+Explanation Methods
 
-## Explanation methods
+The current experiments use two attribution approaches.
 
-I use two approaches to estimate modality contribution.
+Modality Ablation
 
-### Integrated Gradients
+One modality is removed at a time and the change in the model's output is measured.
 
-Integrated Gradients is used to estimate the contribution of the model's inputs to its prediction.
+This gives an estimate of how much the prediction depends on the visual and audio inputs.
 
-The resulting attribution values are aggregated at the modality level and used to calculate CMAS.
+Integrated Gradients
 
-The implementation is in:
+Integrated Gradients is applied to estimate the contribution of the input representations to the model prediction.
 
-```text
-explainability/integrated_gradients.py
-```
+The number of integration steps can be configured in config.yaml.
 
-### Modality ablation
+Important Implementation Detail
 
-For modality ablation, I compare the model's output with both modalities available against the output after removing one modality.
+The current fusion module produces one pooled visual embedding and one pooled audio embedding before cross-attention.
 
-The change in the predicted-class logit is used as an estimate of that modality's contribution.
+Because each attention operation therefore has only one key, the resulting attention weights are always 1.0.
 
-The implementation is in:
+For this reason, the raw attention weights are not treated as a meaningful explanation method in the reported CMAS analysis.
 
-```text
-explainability/attribution.py
-```
+The project instead uses modality ablation and Integrated Gradients for attribution.
 
-## Attention weights
+Dataset
 
-There is an important detail about the current fusion implementation.
+The experiments use FakeAVCeleb.
 
-Each modality is pooled into a single representation before the cross-attention step. This means that the attention operation has only one key/value.
+The dataset contains:
 
-Because of this, the softmax attention weight is always 1.0.
+Real samples
+Video-only manipulated samples
+Audio-only manipulated samples
+Audio-video manipulated samples
 
-I therefore do not use the raw cross-attention weights as modality-level explanations. The explanation analysis in this project uses modality ablation and Integrated Gradients instead.
+The dataset is not included in this repository.
 
-This limitation is also discussed in the paper.
+You need to obtain the dataset separately and follow its applicable terms of use.
 
-## Repository structure
+The repository includes code for preparing the dataset structure expected by the training and evaluation pipeline.
 
-```text
+Reported Results
+
+The following results correspond to the final experiment configuration described in the accompanying paper.
+
+Multimodal Model
+
+Test set size: 3,103 clips
+
+Metric	Score
+Accuracy	99.55%
+Precision	99.97%
+Recall	99.57%
+F1	99.77%
+ROC-AUC	99.93%
+
+Confusion matrix:
+
+                Predicted
+                REAL   FAKE
+
+Actual REAL       74      1
+Actual FAKE       13   3015
+Visual-Only Model
+Metric	Score
+Accuracy	97.23%
+Precision	99.93%
+Recall	97.23%
+F1	98.56%
+ROC-AUC	98.36%
+Audio-Only Model
+Metric	Score
+Accuracy	84.56%
+Precision	99.04%
+Recall	85.01%
+F1	91.49%
+ROC-AUC	83.60%
+CMAS
+
+The reported CMAS analysis used 125 FAKE samples with defined manipulated-modality labels from the evaluation subset.
+
+Attribution Method	Mean CMAS	Standard Deviation
+Modality Ablation	0.9997	0.0052
+Integrated Gradients	0.9466	0.0340
+Ablation + Integrated Gradients	0.9859	0.0067
+
+These results are reported for the experiments described in the paper and should not be interpreted as evidence of generalization beyond the evaluated dataset and experimental setup.
+
+Repository Structure
 CMAS-Deepfake-Detection/
 │
 ├── README.md
 ├── requirements.txt
-├── verify_environment.py
 ├── config.yaml
+├── verify_environment.py
+│
 ├── train.py
 ├── evaluate.py
 ├── inference.py
@@ -299,7 +205,6 @@ CMAS-Deepfake-Detection/
 │   └── dataset.py
 │
 ├── explainability/
-│   ├── integrated_gradients.py
 │   └── attribution.py
 │
 ├── metrics/
@@ -309,386 +214,184 @@ CMAS-Deepfake-Detection/
 │   ├── exp1_visual_only.py
 │   ├── exp2_audio_only.py
 │   ├── exp3_multimodal.py
-│   ├── exp4_cmas_eval.py
-│   └── run_all.py
+│   └── exp4_cmas_eval.py
 │
 ├── visualization/
-│   └── visualization.py
 │
 ├── utils/
-│   ├── logging_utils.py
-│   └── seed.py
 │
 ├── paper_assets/
-│   ├── architecture.py
-│   └── results_template.xlsx
 │
 ├── tests/
-│   └── test_smoke.py
 │
-├── Result/
-│   └── CMAS.pdf
+├── paper_outline/
 │
-└── paper_outline.md
-```
-
-## Installation
+└── Result/
+    └── CMAS.pdf
+Installation
 
 Clone the repository:
 
-```bash
-git clone https://github.com/TejvirG/CMAS_Deepfake_Detection.git
+git clone <YOUR_GITHUB_REPOSITORY_URL>
 cd CMAS-Deepfake-Detection
-```
 
-Install the required Python packages:
+Create a virtual environment:
 
-```bash
-pip install -r requirements.txt
-```
+python -m venv venv
 
-The project also requires FFmpeg.
+Activate it on Windows:
 
-On Ubuntu or Debian:
+venv\Scripts\activate
 
-```bash
-sudo apt-get install -y ffmpeg
-```
+Activate it on Linux or macOS:
 
-On macOS:
-
-```bash
-brew install ffmpeg
-```
-
-A GPU is recommended for training and explainability experiments. The project can also run on CPU, but training will take considerably longer.
-
-## Verify the environment
-
-Before starting a full experiment, run:
-
-```bash
-python verify_environment.py
-```
-
-This checks the main dependencies and components used by the project, including PyTorch, EfficientNet, Wav2Vec2, FFmpeg, MediaPipe, and GPU availability.
-
-Warnings do not necessarily indicate a problem. Any `[FAIL]` message should be checked before starting training.
-
-## Run the tests
-
-The repository contains smoke tests that use synthetic data and do not require FakeAVCeleb.
-
-```bash
-python -m pytest tests/test_smoke.py -v
-```
-
-These tests are useful for checking the main components before starting the longer training process.
-
-Some tests that require pretrained Wav2Vec2 weights may be skipped when the environment does not have internet access.
-
-## Prepare the dataset
-
-After obtaining FakeAVCeleb, create the dataset manifests:
-
-```bash
-python prepare_fakeavceleb.py \
-    --raw_dir /path/to/FakeAVCeleb \
-    --out_dir data/fakeavceleb \
-    --val_ratio 0.15 \
-    --test_ratio 0.15
-```
-
-Before training, check the generated manifests to make sure the file paths and labels are correct.
-
-## Configure the project
-
-Most experiment settings are stored in:
-
-```text
-config.yaml
-```
-
-The configuration includes settings such as:
-
-* Dataset paths
-* Batch size
-* Learning rate
-* Number of epochs
-* Sampling settings
-* Random seed
-* Attribution method
-* Integrated Gradients steps
-* Data-loader settings
-
-The training and experiment scripts read these settings from the configuration file.
-
-## Train the model
-
-The main training script is:
-
-```bash
-python train.py --config config.yaml
-```
-
-The trained checkpoints are saved under:
-
-```text
-checkpoints/
-```
-
-Training logs are stored under:
-
-```text
-logs/
-```
-
-TensorBoard logs are stored under:
-
-```text
-logs/tb/
-```
-
-## Evaluate the model
-
-After training, run:
-
-```bash
-python evaluate.py \
-    --checkpoint checkpoints/best_model_multimodal.pt \
-    --split test \
-    --config config.yaml
-```
-
-The evaluation pipeline generates the classification metrics for the selected test split.
-
-The final reported results are included in:
-
-```text
-Result/CMAS.pdf
-```
-
-## Run the experiments
-
-The project contains four experiment scripts.
-
-### Experiment 1: Visual-only
-
-```bash
-python experiments/exp1_visual_only.py
-```
-
-This evaluates the model using only the visual branch.
-
-### Experiment 2: Audio-only
-
-```bash
-python experiments/exp2_audio_only.py
-```
-
-This evaluates the model using only the audio branch.
-
-### Experiment 3: Multimodal
-
-```bash
-python experiments/exp3_multimodal.py
-```
-
-This evaluates the complete audio-visual model.
-
-### Experiment 4: CMAS evaluation
-
-```bash
-python experiments/exp4_cmas_eval.py
-```
-
-This evaluates modality attribution using CMAS.
-
-The experiments can also be run together:
-
-```bash
-python experiments/run_all.py --config config.yaml
-```
-
-Running all experiments can take several hours on a typical Colab GPU. Running them separately can be more practical when testing or debugging the project.
-
-## Visualization
-
-The visualization script can be run with:
-
-```bash
-python visualization/visualization.py --results_dir results/
-```
-
-It generates figures for the classification and attribution experiments, including:
-
-```text
-results/roc_curve.png
-results/confusion_matrix.png
-results/cmas_comparison.png
-results/attribution_examples.png
-```
-
-## Single-video inference
-
-A trained multimodal model can be used on an individual video:
-
-```bash
-python inference.py \
-    --video path/to/clip.mp4 \
-    --checkpoint checkpoints/best_model_multimodal.pt
-```
-
-The inference output includes the predicted class and modality contribution information.
-
-## Gradio demo
-
-The project also includes a simple Gradio interface.
-
-Run:
-
-```bash
-python app.py
-```
-
-The application will be available locally at:
-
-```text
-http://127.0.0.1:7860
-```
-
-You can upload a video and view the model's prediction, confidence, visual and audio contribution values, and CMAS score where applicable.
-
-## Google Colab
-
-The project can be run on Google Colab with a GPU.
-
-First, enable a GPU through:
-
-```text
-Runtime > Change runtime type > Hardware accelerator > GPU
-```
-
-Clone the repository:
-
-```python
-!git clone https://github.com/TejvirG/CMAS_Deepfake_Detection.git
-%cd CMAS-Deepfake-Detection
-```
+source venv/bin/activate
 
 Install the dependencies:
 
-```python
-!pip install -r requirements.txt -q
-```
+pip install -r requirements.txt
+Environment Check
 
-After installation, restart the runtime.
+Run:
 
-Then run:
+python verify_environment.py
 
-```python
-!python verify_environment.py
-```
+This checks whether the main Python dependencies and required environment components are available.
 
-Run the tests:
+Dataset Preparation
 
-```python
-!python -m pytest tests/test_smoke.py -v
-```
+The dataset is not included in this repository.
 
-After preparing the FakeAVCeleb dataset, training can be started with:
+After obtaining FakeAVCeleb, prepare the dataset using:
 
-```python
-!python train.py --config config.yaml
-```
+python prepare_fakeavceleb.py
 
-The training code automatically checks for CUDA and uses the GPU when available.
+The exact dataset paths should be configured according to the structure expected by the project.
 
-For longer experiments, it is better to keep the dataset, checkpoints, and generated files on Google Drive because files stored only on the temporary Colab runtime can be lost when the session ends.
+Configuration
 
-## Reproducibility
+The main configuration is stored in:
 
-I use a fixed random seed in the default configuration.
+config.yaml
 
-For comparable results, the following should be kept consistent:
+Important settings include:
 
-* FakeAVCeleb version
-* Dataset split
-* Random seed
-* Model configuration
-* Sampling strategy
-* Training settings
-* Attribution settings
-* CMAS evaluation settings
+Random seed
+Batch size
+Dataset paths
+Sampling configuration
+Integrated Gradients steps
+Attribution settings
+CMAS configuration
 
-The repository does not include the FakeAVCeleb dataset or trained model weights.
+Review the configuration before starting training.
 
-## Limitations
+Training
 
-There are several limitations to the current project.
+The main training script is:
 
-### Single dataset
+python train.py
 
-The experiments are based on FakeAVCeleb only. The reported results therefore do not establish how well the model generalizes to other deepfake datasets.
+The training configuration is read from config.yaml.
 
-### Class imbalance
+Evaluation
 
-FakeAVCeleb contains substantially more fake samples than real samples. The relatively small number of real samples is important when interpreting the classification results.
+Run the main evaluation with:
 
-### CMAS evaluation size
+python evaluate.py
 
-Integrated Gradients is computationally expensive, so the CMAS evaluation was performed on a smaller subset of the test data.
+The evaluation scripts report classification metrics and generate the outputs used for analysis.
 
-The reported CMAS results are based on 125 FAKE samples with defined manipulated-modality labels.
+Experiments
 
-### Modality-level explanation
+The repository contains separate experiment scripts for the different model configurations.
 
-CMAS works at the modality level. It measures alignment between visual and audio attribution, but it does not identify the exact frame, facial region, or audio segment responsible for a prediction.
+Visual-only
+python experiments/exp1_visual_only.py
+Audio-only
+python experiments/exp2_audio_only.py
+Multimodal
+python experiments/exp3_multimodal.py
+CMAS Evaluation
+python experiments/exp4_cmas_eval.py
 
-### Dataset-specific shortcuts
+The CMAS evaluation has a configurable sample limit because attribution methods such as Integrated Gradients are computationally more expensive than standard inference.
 
-Deepfake datasets can contain artifacts or shortcuts that make detection easier than it would be on naturally occurring manipulated media. The current implementation does not completely control for these effects.
+Inference
 
-### Attention interpretation
+The inference script can be used to run the trained model on an individual sample:
 
-The current fusion architecture reduces each modality to a single representation before cross-attention. Because of this, the raw attention weights are not suitable for direct modality-level attribution.
+python inference.py
 
-### Computational requirements
+Refer to the script configuration and arguments for the expected input format.
 
-Running the visual-only, audio-only, and multimodal experiments followed by the CMAS evaluation can take several hours on a typical Colab GPU.
+Web Application
 
-## Future work
+A simple application is included in:
 
-Some directions I would like to explore further are:
+app.py
 
-* Evaluating CMAS on additional audio-visual deepfake datasets
-* Testing cross-dataset generalization
-* Increasing the number of real samples where possible
-* Adding temporal sampling and temporal augmentation
-* Investigating dataset-specific shortcuts
-* Comparing CMAS across different multimodal architectures
-* Studying spatial and temporal explanations
-* Evaluating additional attribution methods
-* Extending CMAS beyond modality-level attribution
+It can be started with the appropriate Python environment and the dependencies installed from requirements.txt.
 
-## Citation
+Reproducing the Experiments
 
-If you use CMAS or this implementation in your work, please cite the associated paper.
+A typical workflow is:
 
-```bibtex
-@article{grewal2026cmas,
-  title={CMAS: A Cross-Modal Attribution Score for Modality-Level Explanation Evaluation in Audio-Visual Deepfake Detection},
-  author={Grewal, Tejvir Singh},
-  year={2026},
-  note={Preprint}
-}
-```
+1. Install dependencies
+2. Verify the environment
+3. Obtain FakeAVCeleb
+4. Prepare the dataset
+5. Configure config.yaml
+6. Train the required models
+7. Run evaluation
+8. Run the individual modality experiments
+9. Run CMAS evaluation
+10. Generate visualizations
 
-The final paper is available at [`Result/CMAS.pdf`](Result/CMAS.pdf).
+The reported numbers in the paper correspond to a particular trained-model state, dataset split, configuration, and evaluation procedure. Re-running the repository may produce different results if the data split, checkpoints, environment, or configuration differs.
 
-## License
+Limitations
 
-The code in this repository is released under the MIT License. See `LICENSE` for the full license text.
+There are several limitations to the current implementation.
 
-FakeAVCeleb is distributed separately under its own research-use terms. The dataset is not included in this repository, and its terms should be followed when obtaining and using the dataset.
+Dataset
 
+The reported experiments use FakeAVCeleb only. Results on this dataset do not establish performance on other deepfake datasets or real-world media.
+
+Dataset Split
+
+The final reported test split contains 3,103 clips, including a relatively small number of REAL samples. The dataset split and manifest were regenerated during development, so earlier intermediate experiments used a different test-set size.
+
+Model Architecture
+
+The experiments use a single main visual encoder, audio encoder, and fusion architecture. Comparisons against a wider range of multimodal architectures were outside the current scope.
+
+CMAS
+
+CMAS evaluates modality-level attribution using a two-dimensional visual/audio representation. It does not provide a detailed spatial or temporal explanation of which face region, frame, word, or audio segment influenced the model.
+
+Attention
+
+The current fusion architecture pools each modality before cross-attention. As a result, the attention weights themselves do not provide useful modality-level attribution and are not used as the primary explanation method.
+
+Attribution Evaluation
+
+The reported CMAS analysis uses a limited evaluation subset because Integrated Gradients is computationally expensive.
+
+Dataset-Specific Effects
+
+The project does not claim that the reported near-perfect classification performance demonstrates robustness to all types of synthetic media. Dataset-specific artifacts and shortcuts can affect deepfake detection results, so broader evaluation would be required before making stronger generalization claims.
+
+Project Status
+
+This repository contains the current implementation, experiments, and research manuscript for the project.
+
+The paper is currently being submitted for peer review.
+
+There is currently no claim of acceptance or publication.
+
+Citation
+
+At present, there is no published citation to provide.
+
+If the paper receives an official publication or preprint identifier, this section will be updated with the corresponding citation.
