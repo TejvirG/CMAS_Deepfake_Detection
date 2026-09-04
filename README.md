@@ -1,5 +1,3 @@
----
-
 # CMAS: Cross-Modal Attribution Score for Audio-Visual Deepfake Detection
 
 A multimodal audio-visual deepfake detection system with a focus on evaluating whether model explanations identify the modality that was actually manipulated.
