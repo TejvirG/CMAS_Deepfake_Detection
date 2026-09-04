@@ -1,4 +1,3 @@
-````markdown
 # CMAS: Cross-Modal Attribution Score for Explainable Audio-Visual Deepfake Detection
 
 CMAS is an audio-visual deepfake detection project that I built to study both deepfake classification and the explanations produced by multimodal models.
@@ -15,7 +14,7 @@ The complete paper is available here:
 
 [**CMAS.pdf**](Result/CMAS.pdf)
 
-**Title:**  
+**Title:**
 CMAS: A Cross-Modal Attribution Score for Modality-Level Explanation Evaluation in Audio-Visual Deepfake Detection
 
 The paper contains the complete methodology, experimental setup, results, explainability analysis, and limitations.
@@ -24,35 +23,35 @@ The paper contains the complete methodology, experimental setup, results, explai
 
 The project includes:
 
-- Audio-visual deepfake detection
-- Visual-only and audio-only baselines
-- A multimodal model using both modalities
-- EfficientNet-B0 for visual features
-- Wav2Vec2-base for audio features
-- Cross-modal fusion
-- Integrated Gradients for attribution
-- Modality ablation for attribution
-- The CMAS metric
-- Classification and explainability evaluation
-- A Gradio demo for individual video inference
+* Audio-visual deepfake detection
+* Visual-only and audio-only baselines
+* A multimodal model using both modalities
+* EfficientNet-B0 for visual features
+* Wav2Vec2-base for audio features
+* Cross-modal fusion
+* Integrated Gradients for attribution
+* Modality ablation for attribution
+* The CMAS metric
+* Classification and explainability evaluation
+* A Gradio demo for individual video inference
 
 ## Results
 
 The final multimodal model was evaluated on a test split containing 3,103 clips.
 
-| Model | Accuracy | Precision | Recall | F1 | ROC-AUC |
-|---|---:|---:|---:|---:|---:|
-| Visual-only | 97.23% | 99.93% | 97.23% | 98.56% | 98.36% |
-| Audio-only | 84.56% | 99.04% | 85.01% | 91.49% | 83.60% |
-| Multimodal | 99.55% | 99.97% | 99.57% | 99.77% | 99.93% |
+| Model       | Accuracy | Precision | Recall |     F1 | ROC-AUC |
+| ----------- | -------: | --------: | -----: | -----: | ------: |
+| Visual-only |   97.23% |    99.93% | 97.23% | 98.56% |  98.36% |
+| Audio-only  |   84.56% |    99.04% | 85.01% | 91.49% |  83.60% |
+| Multimodal  |   99.55% |    99.97% | 99.57% | 99.77% |  99.93% |
 
 The CMAS evaluation produced the following results:
 
-| Attribution Method | Mean CMAS | Standard Deviation |
-|---|---:|---:|
-| Modality Ablation | 0.9997 | 0.0052 |
-| Integrated Gradients | 0.9466 | 0.0340 |
-| Both | 0.9859 | 0.0067 |
+| Attribution Method   | Mean CMAS | Standard Deviation |
+| -------------------- | --------: | -----------------: |
+| Modality Ablation    |    0.9997 |             0.0052 |
+| Integrated Gradients |    0.9466 |             0.0340 |
+| Both                 |    0.9859 |             0.0067 |
 
 The CMAS analysis was performed on 125 FAKE samples with defined manipulated-modality labels.
 
@@ -64,13 +63,13 @@ I used the **FakeAVCeleb** dataset for the experiments.
 
 The full dataset contains 21,544 clips:
 
-| Category | Number of clips |
-|---|---:|
-| Real | 500 |
-| Video-only fake | 9,709 |
-| Audio-only fake | 500 |
-| Audio and video fake | 10,835 |
-| Total | 21,544 |
+| Category             | Number of clips |
+| -------------------- | --------------: |
+| Real                 |             500 |
+| Video-only fake      |           9,709 |
+| Audio-only fake      |             500 |
+| Audio and video fake |          10,835 |
+| Total                |          21,544 |
 
 The dataset is not included in this repository. Access needs to be requested from the dataset authors, and the dataset's research-use terms should be followed.
 
@@ -82,7 +81,7 @@ python prepare_fakeavceleb.py \
     --out_dir data/fakeavceleb \
     --val_ratio 0.15 \
     --test_ratio 0.15
-````
+```
 
 This creates:
 
@@ -463,7 +462,7 @@ python evaluate.py \
 
 The evaluation pipeline generates the classification metrics for the selected test split.
 
-The final reported results are included in the paper inside:
+The final reported results are included in:
 
 ```text
 Result/CMAS.pdf
@@ -693,5 +692,3 @@ The code in this repository is released under the MIT License. See `LICENSE` for
 
 FakeAVCeleb is distributed separately under its own research-use terms. The dataset is not included in this repository, and its terms should be followed when obtaining and using the dataset.
 
-```
-```
